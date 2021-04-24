@@ -1,26 +1,35 @@
-import { createStore, combineReducers } from 'redux';
-import { composeWithDevTools } from 'redux-devtools-extension';
-import types from './types';
+import {
+  configureStore,
+  createReducer,
+  combineReducers,
+  getDefaultMiddleware,
+} from '@reduxjs/toolkit';
+import { persistStore, persistReducer } from 'redux-persist';
+import {
+  FLUSH,
+  REHYDRATE,
+  PAUSE,
+  PERSIST,
+  PURGE,
+  REGISTER,
+} from 'redux-persist';
+import storage from 'redux-persist/lib/storage';
+import * as actions from './actions';
 
-const items = (state = [], { type, payload }) => {
-  switch (type) {
-    case types.ADD:
-      return [...state, payload];
-    case types.DELETE:
-      return state.filter(({ id }) => id !== payload);
-    default:
-      return state;
-  }
+const persistConfig = {
+  key: 'phonebook',
+  storage,
 };
 
-const filter = (state = '', { type, payload }) => {
-  switch (type) {
-    case types.FILTER:
-      return payload;
-    default:
-      return state;
-  }
-};
+const items = createReducer([], {
+  [actions.addContact]: (state, { payload }) => [...state, payload],
+  [actions.deleteContact]: (state, { payload }) =>
+    state.filter(({ id }) => id !== payload),
+});
+
+const filter = createReducer('', {
+  [actions.filterContact]: (_, { payload }) => payload,
+});
 
 const contactsReducer = combineReducers({
   items,
@@ -31,6 +40,19 @@ const rootReducer = combineReducers({
   contacts: contactsReducer,
 });
 
-const store = createStore(rootReducer, composeWithDevTools());
+const persistedReducer = persistReducer(persistConfig, rootReducer);
 
-export default store;
+const store = configureStore({
+  reducer: persistedReducer,
+  middleware: getDefaultMiddleware({
+    serializableCheck: {
+      ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
+    },
+  }),
+  devTools: process.env.NODE_ENV === 'development',
+});
+
+const persistor = persistStore(store);
+
+// eslint-disable-next-line import/no-anonymous-default-export
+export default { store, persistor };
